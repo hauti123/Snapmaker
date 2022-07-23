@@ -15,44 +15,46 @@ import (
 
 //const token = "aaf66ddf-bf4e-4d0e-b608-bb4fa3ff2fb7"
 const token = "6a545dbb-3634-44cc-8508-f11a04cbebfe" // Luban token
+const snapmakerPort = 8080
 
-func connect() {
+func ConnectToPrinter(printerIp string) error {
 	client := &http.Client{}
-	//	c.Post(url, ,)
 
 	req, err := http.NewRequest("POST",
-		"http://192.168.188.130:8080/api/v1/connect",
+		fmt.Sprintf("http://%s:%d/api/v1/connect", printerIp, snapmakerPort),
 		strings.NewReader(url.Values{"token": {token}}.Encode()))
 
 	if err != nil {
-		panic(err)
+		return err
 	}
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.Close = true
 
 	resp, err := client.Do(req)
 	if err != nil {
-		panic(err)
+		return err
 	}
 
 	body := make([]byte, 1024)
 	n, err := resp.Body.Read(body)
 
 	if err != nil && err != io.EOF {
-		panic(err)
+		return err
 	}
 
 	fmt.Printf("%s\n", string(body[:n]))
+	return nil
 }
 
-func status() string {
+func GetPrinterStatus(printerIp string) (string, error) {
 	client := &http.Client{}
 
 	req, err := http.NewRequest("GET",
-		"http://192.168.188.130:8080/api/v1/status?token="+token, nil)
+		fmt.Sprintf("http://%s:%d/api/v1/status?token=%s", printerIp, snapmakerPort, token),
+		nil)
 
 	if err != nil {
-		panic(err)
+		return "", err
 	}
 
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
@@ -60,20 +62,20 @@ func status() string {
 
 	resp, err := client.Do(req)
 	if err != nil {
-		panic(err)
+		return "", err
 	}
 
 	body := make([]byte, 1024)
 	n, err := resp.Body.Read(body)
 
 	if err != nil && err != io.EOF {
-		panic(err)
+		return "", err
 	}
 
-	return string(body[:n])
+	return string(body[:n]), nil
 }
 
-func sendFile(filePath string) {
+func SendGcodeFile(printerIp string, filePath string) error {
 
 	fmt.Printf("start upload: %s\n", filePath)
 	file, _ := os.Open(filePath)
@@ -88,7 +90,7 @@ func sendFile(filePath string) {
 
 	tokenPart, err := multipartWriter.CreatePart(tokenHeader)
 	if err != nil {
-		panic(err)
+		return err
 	}
 	io.Copy(tokenPart, strings.NewReader(token))
 
@@ -96,7 +98,10 @@ func sendFile(filePath string) {
 	io.Copy(filePart, file)
 	multipartWriter.Close()
 
-	multipartRequest, _ := http.NewRequest("POST", "http://192.168.188.130:8080/api/v1/upload", body)
+	multipartRequest, _ := http.NewRequest("POST",
+		fmt.Sprintf("http://%s:%d/api/v1/upload", printerIp, snapmakerPort),
+		body)
+
 	multipartRequest.Header.Add("Content-Type", multipartWriter.FormDataContentType())
 	multipartRequest.Close = true
 	client := &http.Client{}
@@ -105,16 +110,21 @@ func sendFile(filePath string) {
 	resp, err := client.Do(multipartRequest)
 
 	if err != nil {
-		panic(err)
+		return err
 	}
 
 	responseBody := make([]byte, 1024)
 	n, err := resp.Body.Read(responseBody)
 
 	if err != nil && err != io.EOF {
-		panic(err)
+		return err
 	}
 
 	fmt.Printf("recevied %d bytes\nstatus: %s\n", n, resp.Status)
 	fmt.Printf("upload response:\n%s\n", string(responseBody[:n]))
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("request failed, status = %s", resp.Status)
+	}
+	return nil
 }

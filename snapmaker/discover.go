@@ -6,12 +6,23 @@ import (
 	"time"
 )
 
+const snapmakerDiscoveryPort = 20054
+const snapmakerDiscoveryPayload = "discover"
+
 func DiscoverSnapmaker(timeout time.Duration) (string, error) {
-	err := sendDiscoveryPacket()
-	if err != nil {
-		return "", err
+
+	startTime := time.Now()
+	for time.Now().Sub(startTime) < timeout {
+		err := sendDiscoveryPacket()
+		if err != nil {
+			continue
+		}
+		ip, err := waitForSnapmakerResponse(timeout)
+		if err == nil {
+			return ip, nil
+		}
 	}
-	return waitForSnapmakerResponse(timeout)
+	return "", fmt.Errorf("discovery timeout reached")
 }
 
 func sendDiscoveryPacket() error {
@@ -22,17 +33,23 @@ func sendDiscoveryPacket() error {
 	}
 	defer pc.Close()
 
-	addr, err := net.ResolveUDPAddr("udp4", "192.168.188.255:20054")
+	broadcastAddresses, err := getBroadcastIp()
 	if err != nil {
 		return err
 	}
 
-	fmt.Println("sending discovery packet")
-	_, err = pc.WriteTo([]byte("discover"), addr)
-	if err != nil {
-		return err
-	}
+	for _, broadcastAddress := range broadcastAddresses {
+		addr, err := net.ResolveUDPAddr("udp4", fmt.Sprintf("%s:%d", broadcastAddress, snapmakerDiscoveryPort))
+		if err != nil {
+			return err
+		}
 
+		fmt.Printf("sending discovery packet to %s\n", addr.String())
+		_, err = pc.WriteTo([]byte(snapmakerDiscoveryPayload), addr)
+		if err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
@@ -60,29 +77,31 @@ func waitForSnapmakerResponse(timeout time.Duration) (string, error) {
 	return host, nil
 }
 
-/*
-func getBroadcastIp() (string, error) {
-	networkInterfaces, err := net.Interfaces()
+func getBroadcastIp() ([]string, error) {
+
+	networkInterfaceAddresses, err := net.InterfaceAddrs()
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
-	for _, networkInterface := range networkInterfaces {
-		addresses, err := networkInterface.Addrs()
-		if err != nil {
-			return "", err
+	broadcastAddresses := make([]string, 0)
+	for _, address := range networkInterfaceAddresses {
+
+		var ipAddress net.IP
+		switch typedAddress := address.(type) {
+		case *net.TCPAddr:
+			ipAddress = typedAddress.IP.To4()
+		case *net.UDPAddr:
+			ipAddress = typedAddress.IP.To4()
+		case *net.IPNet:
+			ipAddress = typedAddress.IP.To4()
+		default:
 		}
 
-		for _, addr := range addrs {
-			var ip net.IP
-			switch v := addr.(type) {
-			case *net.IPNet:
-				ip = v.IP
-			case *net.IPAddr:
-				ip = v.IP
-			}
-			// process IP address
+		if ipAddress != nil && len(ipAddress) == net.IPv4len && ipAddress.IsGlobalUnicast() {
+			ipAddress[3] = 255
+			broadcastAddresses = append(broadcastAddresses, ipAddress.String())
 		}
 	}
+	return broadcastAddresses, nil
 }
-*/
