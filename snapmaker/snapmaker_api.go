@@ -13,16 +13,25 @@ import (
 	"strings"
 )
 
-//const token = "aaf66ddf-bf4e-4d0e-b608-bb4fa3ff2fb7"
-const token = "6a545dbb-3634-44cc-8508-f11a04cbebfe" // Luban token
-const snapmakerPort = 8080
+type Snapmaker struct {
+	ipAdress string
+	port     int
+	token    string
+}
 
-func ConnectToPrinter(printerIp string) error {
+const apiConnect = "connect"
+const apiPrinterStatus = "status"
+const apiGcodeUpload = "upload"
+const apiEnclosureStatus = "enclosure"
+
+const multipartBoundary = "----------------------------268923783128719097072428"
+
+func (sm *Snapmaker) Connect() error {
 	client := &http.Client{}
 
 	req, err := http.NewRequest("POST",
-		fmt.Sprintf("http://%s:%d/api/v1/connect", printerIp, snapmakerPort),
-		strings.NewReader(url.Values{"token": {token}}.Encode()))
+		sm.buildApiUrl(apiConnect),
+		strings.NewReader(url.Values{"token": {sm.token}}.Encode()))
 
 	if err != nil {
 		return err
@@ -46,11 +55,11 @@ func ConnectToPrinter(printerIp string) error {
 	return nil
 }
 
-func GetPrinterStatus(printerIp string) (string, error) {
+func (sm *Snapmaker) GetStatus() (string, error) {
 	client := &http.Client{}
 
 	req, err := http.NewRequest("GET",
-		fmt.Sprintf("http://%s:%d/api/v1/status?token=%s", printerIp, snapmakerPort, token),
+		sm.buildApiUrl(apiPrinterStatus)+"?token="+sm.token,
 		nil)
 
 	if err != nil {
@@ -75,7 +84,7 @@ func GetPrinterStatus(printerIp string) (string, error) {
 	return string(body[:n]), nil
 }
 
-func SendGcodeFile(printerIp string, filePath string) error {
+func (sm *Snapmaker) SendGcodeFile(filePath string) error {
 
 	fmt.Printf("start upload: %s\n", filePath)
 	file, _ := os.Open(filePath)
@@ -83,7 +92,7 @@ func SendGcodeFile(printerIp string, filePath string) error {
 
 	body := &bytes.Buffer{}
 	multipartWriter := multipart.NewWriter(body)
-	multipartWriter.SetBoundary("----------------------------268923783128719097072428")
+	multipartWriter.SetBoundary(multipartBoundary)
 
 	tokenHeader := make(textproto.MIMEHeader)
 	tokenHeader.Set("Content-Disposition", `form-data; name="token"`)
@@ -99,7 +108,7 @@ func SendGcodeFile(printerIp string, filePath string) error {
 	multipartWriter.Close()
 
 	multipartRequest, _ := http.NewRequest("POST",
-		fmt.Sprintf("http://%s:%d/api/v1/upload", printerIp, snapmakerPort),
+		sm.buildApiUrl(apiGcodeUpload),
 		body)
 
 	multipartRequest.Header.Add("Content-Type", multipartWriter.FormDataContentType())
@@ -127,4 +136,8 @@ func SendGcodeFile(printerIp string, filePath string) error {
 		return fmt.Errorf("request failed, status = %s", resp.Status)
 	}
 	return nil
+}
+
+func (sm *Snapmaker) buildApiUrl(api string) string {
+	return fmt.Sprintf("http://%s:%d/api/v1/%s", sm.ipAdress, sm.port, api)
 }

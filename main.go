@@ -7,35 +7,36 @@ import (
 	"github.com/hauti123/Snapmaker/snapmaker"
 )
 
-func statusLoop(printerIp string) {
+func statusLoop(printer *snapmaker.Snapmaker) {
 	for {
 		time.Sleep(1 * time.Second)
-		_, _ = snapmaker.GetPrinterStatus(printerIp)
+		_, _ = printer.GetStatus()
 	}
 }
 
 const discoverTimeout = 5 * time.Second
 
 func main() {
-	printerIp, err := snapmaker.DiscoverSnapmaker(discoverTimeout)
+	printer, err := snapmaker.DiscoverSnapmaker(discoverTimeout)
 	if err != nil {
 		panic(err)
 	}
-	err = snapmaker.ConnectToPrinter(printerIp)
+	err = printer.Connect()
 	if err != nil {
 		panic(err)
 	}
 
-	// initial status request is needed, otherweise upload will fail with "401 - Unauthorzied, Machine not yet connected"
-	status, err := snapmaker.GetPrinterStatus(printerIp)
+	// initial status request and status loop is needed, otherweise upload will fail with "401 - Unauthorzied, Machine not yet connected"
+	status, err := printer.GetStatus()
 	if err != nil {
 		panic(err)
 	}
 
 	fmt.Printf("Initial printer status:\n%s\n", status)
 
-	go statusLoop(printerIp)
-	err = snapmaker.SendGcodeFile(printerIp, "test.gcode")
+	go statusLoop(&printer)
+
+	err = printer.SendGcodeFile("test.gcode")
 	if err != nil {
 		panic(err)
 	}
