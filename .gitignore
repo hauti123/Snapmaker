@@ -1,2 +1,4 @@
 *.exe
 *.pcapng
+.vscode/
+go.sum
