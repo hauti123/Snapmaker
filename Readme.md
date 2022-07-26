@@ -28,6 +28,10 @@ Each request is authenticated by an API token. However, the way how it's placed 
 
 TODO: It's not yet clear how this token is issued. Currently I'm using the API token used by Luban.
 
+The token that used by Luban for a certain Snapmaker can be found in the following file in the section `server`:
+`C:\Users\<username>\AppData\Roaming\snapmaker-luban\machine.json`
+Using this token should work fine.
+
 ### Snapmaker discovery
 Discovery is done by sending an UDP packet to the broadcast address of the local network interfaces. Usually the Snapmaker then responds with a short descriptive string. The IP address of the Snapmaker can either be read from that string or from the UDP connection used for the response packet.
 
