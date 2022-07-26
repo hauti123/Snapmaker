@@ -129,7 +129,7 @@ func (sm *Snapmaker) SendGcodeFile(filePath string) error {
 	if err != nil {
 		return err
 	}
-	io.Copy(tokenPart, strings.NewReader(token))
+	io.Copy(tokenPart, strings.NewReader(sm.token))
 
 	filePart, _ := multipartWriter.CreateFormFile("file", filepath.Base(file.Name()))
 	io.Copy(filePart, file)

@@ -1,9 +1,24 @@
-# Snapmaker GCode Upload Command Line Tool
+# Snapmaker CLI Tool
 
-This tool shall at some point be able to upload a GCode file to a Snapmaker using the command line.
+This tool shall at some point be able to perform the following operations
+* upload a .gcode file
+* get printer status
+* get enclosure status
+* execute Marlin commands
 
 ## Why Golang?
 Because it's currently my favourite language.
+
+## CLI
+
+```
+.\snapcmd.exe upload --api-token blabla --printer-ip 192.168.1.2 --discovery-timeout 15 test.gcode
+```
+* subcommand: operation to perform. Currently only `upload` is supported.
+* `--api-token`: Mandatory parameter for now, an API token the Snapmaker already knows. TODO: Details of token creation and authentication yet to be researched.
+* `--printer-ip`: Optional. IP address of printer, if omitted an auto-discovery will be done. TODO: auto-discovery not yet suited for multiple printers in the network.
+* `--discovery-timeout`: Optional. Defaults to 5s.
+* filepath: specific to `upload`. Has to be a `.gcode` file.
 
 ## Snapmaker API
 To get the upload sequence right Wireshark sniffs where used to reverse engineer the network protocol of Snapmaker. For this tool the following API endpoints are used:
