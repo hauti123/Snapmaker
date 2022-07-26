@@ -2,6 +2,7 @@ package snapmaker
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"io"
 	"mime/multipart"
@@ -11,13 +12,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 )
-
-type Snapmaker struct {
-	ipAdress string
-	port     int
-	token    string
-}
 
 const apiConnect = "connect"
 const apiPrinterStatus = "status"
@@ -26,9 +22,33 @@ const apiEnclosureStatus = "enclosure"
 
 const multipartBoundary = "----------------------------268923783128719097072428"
 
+type Snapmaker struct {
+	ipAdress   string
+	port       int
+	token      string
+	lastStatus string
+	ctx        context.Context
+	cancel     context.CancelFunc
+}
+
+func NewSnapmaker(ipAddress string, apiToken string) Snapmaker {
+
+	ctx, cancel := context.WithCancel(context.Background())
+	return Snapmaker{
+		ipAdress: ipAddress,
+		port:     snapmakerApiPort,
+		token:    apiToken,
+		ctx:      ctx,
+		cancel:   cancel,
+	}
+}
+
 func (sm *Snapmaker) Connect() error {
 	client := &http.Client{}
 
+	fmt.Printf("%v\n", sm)
+	apiUrl := sm.buildApiUrl(apiConnect)
+	fmt.Printf("url: %s\n", apiUrl)
 	req, err := http.NewRequest("POST",
 		sm.buildApiUrl(apiConnect),
 		strings.NewReader(url.Values{"token": {sm.token}}.Encode()))
@@ -39,6 +59,7 @@ func (sm *Snapmaker) Connect() error {
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.Close = true
 
+	fmt.Printf("%v\n", req)
 	resp, err := client.Do(req)
 	if err != nil {
 		return err
@@ -51,7 +72,14 @@ func (sm *Snapmaker) Connect() error {
 		return err
 	}
 
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("connect request failed: %s\n%s", resp.Status, string(body[:n]))
+	}
+
 	fmt.Printf("%s\n", string(body[:n]))
+
+	// status loop is neded to avoid connection loss
+	go sm.statusLoop()
 	return nil
 }
 
@@ -138,6 +166,26 @@ func (sm *Snapmaker) SendGcodeFile(filePath string) error {
 	return nil
 }
 
-func (sm *Snapmaker) buildApiUrl(api string) string {
+func (sm *Snapmaker) Close() {
+	sm.cancel()
+}
+
+func (sm Snapmaker) buildApiUrl(api string) string {
 	return fmt.Sprintf("http://%s:%d/api/v1/%s", sm.ipAdress, sm.port, api)
+}
+
+func (sm *Snapmaker) statusLoop() {
+	ticker := time.NewTicker(statusLoopTicker)
+	for {
+		select {
+		case <-sm.ctx.Done():
+			return
+		case <-ticker.C:
+			var err error
+			sm.lastStatus, err = sm.GetStatus()
+			if err != nil {
+				fmt.Printf("GetStatus failed: %v", err)
+			}
+		}
+	}
 }
