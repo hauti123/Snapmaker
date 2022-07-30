@@ -6,7 +6,7 @@ import (
 	"time"
 )
 
-func DiscoverSnapmaker(timeout time.Duration, apiToken string) (Snapmaker, error) {
+func DiscoverSnapmaker(timeout time.Duration, apiToken string) (*Snapmaker, error) {
 
 	startTime := time.Now()
 	for time.Now().Sub(startTime) < timeout {
@@ -14,19 +14,15 @@ func DiscoverSnapmaker(timeout time.Duration, apiToken string) (Snapmaker, error
 		if err != nil {
 			continue
 		}
-		ip, err := waitForSnapmakerResponse(timeout)
+		ipAddress, err := waitForSnapmakerResponse(timeout)
 
 		if err != nil {
-			return Snapmaker{}, err
+			return nil, err
 		}
 
-		return Snapmaker{
-			ipAdress: ip,
-			port:     snapmakerApiPort,
-			token:    apiToken,
-		}, nil
+		return NewSnapmaker(ipAddress, apiToken), nil
 	}
-	return Snapmaker{}, fmt.Errorf("discovery timeout reached")
+	return nil, fmt.Errorf("discovery timeout reached")
 }
 
 func sendDiscoveryPacket() error {
