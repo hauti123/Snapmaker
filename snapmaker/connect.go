@@ -19,14 +19,12 @@ type connectResponse struct {
 }
 
 func (sm *Snapmaker) Connect() error {
-	client := &http.Client{}
-
 	req, err := sm.buildConnectRequest()
 	if err != nil {
 		return err
 	}
 
-	resp, err := client.Do(req)
+	resp, err := sm.httpClient.Do(req)
 	if err != nil {
 		return err
 	}
