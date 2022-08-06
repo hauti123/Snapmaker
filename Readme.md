@@ -54,7 +54,7 @@ The `upload` command sens a `.gcode` file to the printer. The full path (absolut
 ```
 
 ## Snapmaker API
-To get the upload sequence right Wireshark sniffs where used to reverse engineer the network protocol of Snapmaker. For this tool the following API endpoints are used:
+To get the upload sequence right Wireshark sniffs where used to reverse engineer the network protocol using a Snapmaker 2.0 A350.
 
 ### API token
 Each request is authenticated by an API token. However, the way how it's placed in the request differs for each endpoint.
